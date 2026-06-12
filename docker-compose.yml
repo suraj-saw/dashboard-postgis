@@ -1,0 +1,107 @@
+version: "3.9"
+
+services:
+
+  postgres:
+    image: postgis/postgis:16-3.5
+
+    container_name: dashboard-postgis-postgres
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: dashboard_temp_db
+
+    ports:
+      - "127.0.0.1:5434:5432"
+
+    volumes:
+      - postgres_postgis_data:/var/lib/postgresql/data
+
+    networks:
+      - dashboard-postgis-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d dashboard_temp_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  redis:
+    image: redis:7-alpine
+
+    container_name: dashboard-postgis-redis
+
+    restart: always
+
+    ports:
+      - "127.0.0.1:6381:6379"
+
+    networks:
+      - dashboard-postgis-net
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+    container_name: dashboard-postgis-backend
+
+    restart: always
+
+    env_file:
+      - ./backend/.env
+
+    depends_on:
+
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    networks:
+      - dashboard-postgis-net
+
+
+  nginx:
+    image: nginx:alpine
+
+    container_name: dashboard-postgis-nginx
+
+    restart: always
+
+    ports:
+      - "8080:80"
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+
+    depends_on:
+      - backend
+
+    networks:
+      - dashboard-postgis-net
+
+
+
+networks:
+
+  dashboard-postgis-net:
+    driver: bridge
+
+
+volumes:
+
+  postgres_postgis_data:

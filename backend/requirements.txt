@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+
+sqlalchemy
+geoalchemy2
+psycopg2-binary
+
+pandas
+openpyxl
+
+redis
+shapely
+
+python-dotenv
+python-multipart
