@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
+import AccidentGISMap from "../components/maps/AccidentGISMap";
+
 import {
   Activity,
   AlertTriangle,
@@ -518,7 +520,7 @@ export default function Dashboard() {
               <SeverityChart data={data.severity} />
             </Panel>
           </div>
-          
+
           {/* Dual Heatmaps */}
           <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Panel
@@ -536,7 +538,7 @@ export default function Dashboard() {
             >
               <GujaratMap data={data.districts} metric="fatalities" />
             </Panel>
-                        <Panel
+            <Panel
               title="Fatal Accident Intensity"
               icon={<ShieldAlert size={14} />}
               delay={0.16}
@@ -747,6 +749,45 @@ export default function Dashboard() {
               </div>
             </Panel>
           )}
+
+          {/* ================================
+    PostGIS Accident Map
+================================ */}
+
+
+          <div className="mt-8">
+
+
+            <div className="mb-5">
+
+
+              <h2 className="
+            text-xl 
+            font-semibold
+        ">
+                GIS Accident Hotspot Analysis
+              </h2>
+
+
+
+              <p className="
+            text-sm
+            text-gray-500
+        ">
+                Interactive PostGIS based accident visualization
+              </p>
+
+
+            </div>
+
+
+
+
+            <AccidentGISMap />
+
+
+
+          </div>
         </motion.div>
       </main>
     </div>
