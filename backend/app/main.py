@@ -20,7 +20,7 @@ from app.models.district import District
 
 from app.routers import dashboard
 from app.routers import gis
-
+from app.routers import district
 
 
 @asynccontextmanager
@@ -82,7 +82,9 @@ app.include_router(
     gis.router
 )
 
-
+app.include_router(
+    district.router
+)
 
 @app.get("/health")
 def health_check():

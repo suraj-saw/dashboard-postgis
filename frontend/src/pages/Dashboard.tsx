@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import AccidentGISMap from "../components/maps/AccidentGISMap";
+import DistrictHotspotMap from "../components/maps/DistrictHotsptMap";
 
 import {
   Activity,
@@ -756,28 +757,13 @@ export default function Dashboard() {
 
 
           <div className="mt-8">
-
-
             <div className="mb-5">
-
-
-              <h2 className="
-            text-xl 
-            font-semibold
-        ">
+              <h2 className="text-xl font-semibold">
                 GIS Accident Hotspot Analysis
               </h2>
-
-
-
-              <p className="
-            text-sm
-            text-gray-500
-        ">
+              <p className="text-sm text-gray-500">
                 Interactive PostGIS based accident visualization
               </p>
-
-
             </div>
 
 
@@ -785,6 +771,18 @@ export default function Dashboard() {
 
             <AccidentGISMap />
 
+
+
+          </div>
+
+          <div className="card">
+
+            <h2>
+              District Accident Hotspot Analysis
+            </h2>
+
+
+            <DistrictHotspotMap />
 
 
           </div>

@@ -1,3 +1,5 @@
+from app.database import engine
+from app.database import Base
 import json
 import os
 
@@ -6,6 +8,7 @@ from shapely.geometry import shape
 
 from app.database import SessionLocal
 from app.models.district import District
+from app.models.accident import Accident
 from app.core.config import POSTGIS_SRID
 
 
@@ -31,7 +34,7 @@ GEOJSON_PATH = os.path.join(
 )
 
 def seed_districts():
-
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     try:
