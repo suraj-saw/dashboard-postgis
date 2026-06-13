@@ -1,22 +1,38 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-
+from sqlalchemy import func, text
 import json
+from sqlalchemy import extract
+import math
 
 from app.database import get_db
 from app.models.accident import Accident
 
+def clean_value(value):
+
+    if isinstance(value, float):
+
+        if math.isnan(value):
+            return None
+
+    return value
 
 router = APIRouter(
     prefix="/gis",
     tags=["GIS"]
 )
 
+SEVERITY_WEIGHT = {
+    "Fatal": 1.0,
+    "Grievous Injury": 0.7,
+    "Minor Injury": 0.4,
+    "Damage Only": 0.2,
+}
+
 
 # ---------------------------------------------------
-# GeoJSON API
-# Used by frontend map libraries (Leaflet / Mapbox)
+# GeoJSON API – returns all accident points as GeoJSON
+# Used by MapLibre frontend
 # ---------------------------------------------------
 @router.get("/geojson")
 def get_accidents_geojson(
@@ -25,273 +41,138 @@ def get_accidents_geojson(
     severity: str | None = None,
     db: Session = Depends(get_db)
 ):
-
-    query = db.query(Accident)
+    query = db.query(
+        Accident.accident_id,
+        Accident.district,
+        Accident.severity,
+        Accident.latitude,
+        Accident.longitude,
+        func.ST_AsGeoJSON(Accident.location).label("geojson"),
+    ).filter(Accident.location.isnot(None))
 
     if district:
-        query = query.filter(
-            Accident.district == district
-        )
-
+        query = query.filter(Accident.district == district)
     if year:
-        query = query.filter(
-            Accident.year == year
-        )
-
+        query = query.filter(extract("year", Accident.accident_datetime) == year)
     if severity:
-        query = query.filter(
-            Accident.severity == severity
-        )
+        query = query.filter(Accident.severity == severity)
 
-
-    accidents = (
-        query
-        .filter(Accident.location.isnot(None))
-        .all()
-    )
-
+    rows = query.all()
 
     features = []
-
-
-    for accident in accidents:
-
-        geometry = db.scalar(
-            func.ST_AsGeoJSON(
-                accident.location
-            )
-        )
-
-
-        features.append(
-            {
-                "type": "Feature",
-
-                "geometry": json.loads(
-                    geometry
-                ),
-
-                "properties": {
-
-                    "id": accident.id,
-
-                    "district": accident.district,
-
-                    "severity": accident.severity,
-
-                    "year": accident.year,
-                }
+    for row in rows:
+        if not row.geojson:
+            continue
+        features.append({
+            "type": "Feature",
+            "geometry": json.loads(row.geojson),
+            "properties": {
+                "id": row.accident_id,
+                "district": row.district,
+                "severity": row.severity,
+                "severity_weight": SEVERITY_WEIGHT.get(row.severity, 0.3),
             }
-        )
-
+        })
 
     return {
-
         "type": "FeatureCollection",
-
         "features": features
     }
 
 
-
 # ---------------------------------------------------
-# Nearby Accident Search
-# Finds accidents within radius meters
+# Nearby Accident Search – ST_DWithin
 # ---------------------------------------------------
 @router.get("/nearby")
 def nearby_accidents(
-
     latitude: float = Query(...),
-
     longitude: float = Query(...),
-
-    radius: int = Query(
-        1000,
-        description="Radius in meters"
-    ),
-
+    radius: int = Query(1000, description="Radius in meters"),
     db: Session = Depends(get_db)
 ):
-
-
     user_point = func.ST_SetSRID(
-
-        func.ST_MakePoint(
-            longitude,
-            latitude
-        ),
-
+        func.ST_MakePoint(longitude, latitude),
         4326
     )
 
-
-    accidents = (
-
+    results = (
         db.query(
-
-            Accident,
-
+            Accident.accident_id,
+            Accident.district,
+            Accident.severity,
+            Accident.latitude,
+            Accident.longitude,
             func.ST_DistanceSphere(
                 Accident.location,
                 user_point
-            ).label(
-                "distance"
-            )
+            ).label("distance")
         )
-
+        .filter(Accident.location.isnot(None))
         .filter(
-
             func.ST_DWithin(
-
-                func.Geography(
-                    Accident.location
-                ),
-
-                func.Geography(
-                    user_point
-                ),
-
+                func.Geography(Accident.location),
+                func.Geography(user_point),
                 radius
             )
         )
-
-        .order_by(
-            "distance"
-        )
-
+        .order_by("distance")
+        .limit(200)
         .all()
     )
 
-
-
     return {
-
-        "total": len(accidents),
-
+        "total": len(results),
         "data": [
-
             {
-
-                "id": accident.id,
-
-                "district": accident.district,
-
-                "severity": accident.severity,
-
-                "latitude": accident.latitude,
-
-                "longitude": accident.longitude,
-
-                "distance_meters": round(
-                    distance,
-                    2
-                )
+                "id": row.accident_id,
+                "district": row.district,
+                "severity": row.severity,
+                "latitude": row.latitude,
+                "longitude": row.longitude,
+                "distance_meters": round(row.distance, 2)
             }
-
-            for accident, distance in accidents
-
+            for row in results
         ]
     }
 
 
-
-
 # ---------------------------------------------------
-# Accident Hotspots
-# Spatial clustering using grid
+# Hotspots – grid clustering via ST_SnapToGrid
 # ---------------------------------------------------
 @router.get("/hotspots")
 def accident_hotspots(
-
-    grid_size: float = Query(
-        0.05,
-        description="Cluster grid size"
-    ),
-
+    grid_size: float = Query(0.05, description="Cluster grid size in degrees"),
     db: Session = Depends(get_db)
 ):
-
-
-    grid = func.ST_SnapToGrid(
-
-        Accident.location,
-
-        grid_size
-
-    )
-
+    grid = func.ST_SnapToGrid(Accident.location, grid_size)
 
     results = (
-
         db.query(
-
-            func.ST_Y(
-                grid
-            ).label(
-                "latitude"
-            ),
-
-
-            func.ST_X(
-                grid
-            ).label(
-                "longitude"
-            ),
-
-
-            func.count(
-                Accident.id
-            ).label(
-                "count"
-            )
-
+            func.ST_Y(func.ST_Centroid(func.ST_Collect(Accident.location))).label("latitude"),
+            func.ST_X(func.ST_Centroid(func.ST_Collect(Accident.location))).label("longitude"),
+            func.count(Accident.id).label("count")
         )
-
-
-        .filter(
-            Accident.location.isnot(None)
-        )
-
-
-        .group_by(
-            grid
-        )
-
-
-        .order_by(
-            func.count(
-                Accident.id
-            ).desc()
-        )
-
-
-        .limit(
-            50
-        )
-
-
+        .filter(Accident.location.isnot(None))
+        .group_by(grid)
+        .order_by(func.count(Accident.id).desc())
+        .limit(500)
         .all()
-
     )
 
-
-
     return {
-
-        "data": [
-
+        "type": "FeatureCollection",
+        "features": [
             {
-
-                "latitude": lat,
-
-                "longitude": lon,
-
-                "accident_count": count
-
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [row.longitude, row.latitude]
+                },
+                "properties": {
+                    "accident_count": row.count
+                }
             }
-
-            for lat, lon, count in results
-
+            for row in results
+            if row.latitude is not None and row.longitude is not None
         ]
-
     }

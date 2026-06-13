@@ -57,6 +57,22 @@ router = APIRouter(
     tags=["Dashboard"],
 )
 
+def safe_text(value, default="Unknown"):
+    """
+    Converts database NULL, empty strings,
+    and old NaN strings into safe API values.
+    """
+    if value is None:
+        return default
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        if value == "" or value.lower() == "nan":
+            return default
+
+    return value
+
 # Filter Options (dynamic)
 @router.get("/filter-options")
 def get_filter_options(
@@ -115,8 +131,20 @@ def get_summary(
             1 for a in accidents if a.severity == SEVERITY_DAMAGE_ONLY
         ),
         total_vehicles=sum(a.no_of_vehicles or 0 for a in accidents),
-        districts_covered=len({a.district for a in accidents}),
-        police_stations=len({a.police_station for a in accidents}),
+        districts_covered=len(
+            {
+                safe_text(a.district)
+                for a in accidents
+                if safe_text(a.district) != "Unknown"
+            }
+        ),
+        police_stations=len(
+            {
+                safe_text(a.police_station)
+                for a in accidents
+                if safe_text(a.police_station) != "Unknown"
+            }
+        ),
     )
 
 # District
@@ -150,12 +178,13 @@ def get_by_district(
     )
 
     for accident in query.all():
-        district_map[accident.district]["accident_count"] += 1
-        district_map[accident.district]["fatalities"] += total_fatalities(accident)
+        district = safe_text(accident.district)
+        district_map[district]["accident_count"] += 1
+        district_map[district]["fatalities"] += total_fatalities(accident)
     return DistrictResponse(
         data=[
             DistrictCount(
-                district=name,
+                district=safe_text(name),
                 accident_count=value["accident_count"],
                 fatalities=value["fatalities"],
             )
@@ -200,7 +229,7 @@ def get_by_severity(
     return SeverityResponse(
         data=[
             SeverityCount(
-                severity=row.severity,
+                severity=safe_text(row.severity),
                 count=row.count,
             )
             for row in rows
@@ -308,7 +337,7 @@ def get_by_collision(
     return CollisionResponse(
         data=[
             CollisionCount(
-                collision_type=row.collision_type,
+                collision_type=safe_text(row.collision_type),
                 count=row.count,
             )
             for row in rows
@@ -350,8 +379,8 @@ def get_heatmap(
                 accident_id=a.accident_id,
                 latitude=a.latitude,
                 longitude=a.longitude,
-                severity=a.severity,
-                district=a.district,
+                severity=safe_text(a.severity),
+                district=safe_text(a.district),
             )
             for a in accidents
             if (a.latitude is not None and a.longitude is not None)
@@ -436,13 +465,14 @@ def get_by_road(
     )
 
     for accident in query.all():
-        item = road_map[accident.road_classification]
+        road = safe_text(accident.road_classification)
+        item = road_map[road]
         item["accident_count"] += 1
         item["fatalities"] += total_fatalities(accident)
     return RoadClassResponse(
         data=[
             RoadClassCount(
-                road_classification=name,
+                road_classification=safe_text(name),
                 accident_count=value["accident_count"],
                 fatalities=value["fatalities"],
             )
@@ -491,7 +521,7 @@ def get_by_weather(
     return WeatherResponse(
         data=[
             WeatherCount(
-                weather_condition=row.weather_condition,
+                weather_condition=row.weather_condition or "Unknown",
                 count=row.count,
             )
             for row in rows
@@ -535,7 +565,7 @@ def get_by_light(
     return LightResponse(
         data=[
             LightCount(
-                light_condition=row.light_condition,
+                light_condition=row.light_condition or "Unknown",
                 count=row.count,
             )
             for row in rows
@@ -575,16 +605,18 @@ def get_by_police_station(
     )
 
     for accident in query.all():
-        item = stations[accident.police_station]
-        item["district"] = accident.district
+        station = safe_text(accident.police_station)
+
+        item = stations[station]
+        item["district"] = safe_text(accident.district)
         item["accident_count"] += 1
         item["fatalities"] += total_fatalities(accident)
 
     return PoliceStationResponse(
         data=[
             PoliceStationCount(
-                police_station=name,
-                district=value["district"],
+                police_station=safe_text(name),
+                district=safe_text(value["district"]),
                 accident_count=value["accident_count"],
                 fatalities=value["fatalities"],
             )
@@ -673,8 +705,9 @@ def get_top_dangerous(
     )
 
     for accident in query.all():
-        ranking[accident.district]["fatal_accidents"] += 1
-        ranking[accident.district]["total_killed"] += total_fatalities(accident)
+        district = safe_text(accident.district)
+        ranking[district]["fatal_accidents"] += 1
+        ranking[district]["total_killed"] += total_fatalities(accident)
 
     rows = sorted(
         ranking.items(),
@@ -686,7 +719,7 @@ def get_top_dangerous(
         data=[
             DangerousDistrict(
                 rank=index + 1,
-                district=name,
+                district=safe_text(name),
                 fatal_accidents=value["fatal_accidents"],
                 total_killed=value["total_killed"],
             )
