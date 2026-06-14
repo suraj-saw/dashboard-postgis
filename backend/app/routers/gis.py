@@ -7,6 +7,13 @@ import math
 
 from app.database import get_db
 from app.models.accident import Accident
+from app.services.gis_service import (
+    get_accident_markers,
+)
+from app.services.gis_service import (
+    get_accident_heatmap
+)
+from app.services.gis_service import get_accident_blackspots
 
 def clean_value(value):
 
@@ -176,3 +183,83 @@ def accident_hotspots(
             if row.latitude is not None and row.longitude is not None
         ]
     }
+
+@router.get(
+    "/accident-markers"
+)
+def accident_markers(
+    db: Session = Depends(get_db)
+):
+
+    rows = get_accident_markers(
+        db
+    )
+
+
+    features = []
+
+
+    for row in rows:
+
+
+        features.append(
+            {
+                "type": "Feature",
+
+                "geometry": {
+
+                    "type": "Point",
+
+                    "coordinates": [
+
+                        row.longitude,
+
+                        row.latitude
+
+                    ]
+
+                },
+
+
+                "properties": {
+
+
+                    "id": row.id,
+
+
+                    "severity": row.severity,
+
+
+                    "road_name": row.road_name,
+
+
+                    "weather_condition": row.weather_condition,
+
+                }
+
+            }
+        )
+
+
+    return {
+
+        "type": "FeatureCollection",
+
+        "features": features
+
+    }
+
+
+@router.get("/heatmap")
+def accident_heatmap(
+        db: Session = Depends(get_db)
+    ):
+
+    return get_accident_heatmap(db)
+
+@router.get("/blackspots")
+def accident_blackspots(
+    db: Session = Depends(get_db)
+):
+
+    return get_accident_blackspots(db)

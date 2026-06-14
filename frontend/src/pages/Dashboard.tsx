@@ -1,7 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import AccidentGISMap from "../components/maps/AccidentGISMap";
-import DistrictHotspotMap from "../components/maps/DistrictHotsptMap";
+import AccidentHeatmap from "../components/maps/AccidentHeatmap";
+import DistrictHotspotMap from "../components/maps/DistrictHotspotMap";
+import AccidentMarkerMap
+  from "../components/maps/AccidentMarkerMap";
 
 import {
   Activity,
@@ -46,6 +49,8 @@ import type { DashboardFilters } from "../types/dashboard";
 import { GujaratMap } from "../components/charts/GujaratMap";
 import { fetchFilterOptions } from "../api/dashboardApi";
 import type { FilterOptions } from "../api/dashboardApi";
+import BlackspotMap
+  from "../components/maps/BlackspotMap";
 
 
 function fmt(n: number) {
@@ -778,11 +783,44 @@ export default function Dashboard() {
           <div className="card">
 
             <h2>
-              District Accident Hotspot Analysis
+              District Accident Analysis
             </h2>
 
 
             <DistrictHotspotMap />
+
+
+          </div>
+          <div className="card">
+
+            <h2>
+              Accident Location Markers
+            </h2>
+
+
+            <AccidentMarkerMap />
+
+
+          </div>
+          <div>
+
+            <h2>
+              Accident Density Heatmap
+            </h2>
+
+
+            <AccidentHeatmap />
+
+
+          </div>
+          <div>
+
+            <h2>
+              Accident Blackspot Detection
+            </h2>
+
+
+            <BlackspotMap />
 
 
           </div>

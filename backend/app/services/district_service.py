@@ -52,3 +52,5 @@ def get_district_hotspots(
 
 
     return result.fetchall()
+
+    
