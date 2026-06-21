@@ -761,7 +761,7 @@ export default function Dashboard() {
 ================================ */}
 
 
-          <div className="mt-8">
+          {/* <div className="mt-8">
             <div className="mb-5">
               <h2 className="text-xl font-semibold">
                 GIS Accident Hotspot Analysis
@@ -770,15 +770,8 @@ export default function Dashboard() {
                 Interactive PostGIS based accident visualization
               </p>
             </div>
-
-
-
-
             <AccidentGISMap />
-
-
-
-          </div>
+          </div> */}
 
           <div className="card">
 
